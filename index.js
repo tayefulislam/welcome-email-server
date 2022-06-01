@@ -1,7 +1,7 @@
 const express = require("express")
 const cors = require("cors")
 const { MongoClient, ServerApiVersion } = require('mongodb');
-const { async } = require("@firebase/util");
+const nodemailer = require("nodemailer");
 require('dotenv').config()
 const app = express()
 const port = process.env.PORT || 5000;
@@ -29,26 +29,79 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 // });
 
 
+
+async function sendEmail(newUser, welcomeTemplete) {
+
+
+    // console.log(newUser, welcomeTemplete)
+
+
+    let transporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST,
+        port: 465,
+        secure: true,
+        auth: {
+            user: process.env.SENDER_EMAIL,
+            pass: process.env.EMAIL_PASSWORD,
+        },
+    });
+
+
+
+    let info = await transporter.sendMail({
+        from: process.env.SENDER_EMAIL,
+        to: newUser.email,
+        subject: welcomeTemplete.subject,
+        text: `${welcomeTemplete.text}`,
+        html: `<body>Dear ${newUser.name} ${welcomeTemplete.message} <br/> Have a nice day, <br/> ${welcomeTemplete.senderName}</body>`,
+    });
+    console.log("Message sent: %s", info.messageId);
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async function run() {
 
     try {
         await client.connect()
 
-        const collection = client.db("welcomeEmail").collection("users");
+        const userCollection = client.db("welcomeEmail").collection("users");
+        const emailTempletesCollection = client.db("welcomeEmail").collection("emailTempletes");
 
 
         app.post('/adduser', async (req, res) => {
             const newUser = req.body;
-            console.log(newUser)
-            const insertUser = await collection.insertOne(newUser);
+
+            const insertUser = await userCollection.insertOne(newUser);
 
             if (insertUser?.insertedId) {
-                console.log(insertUser)
+
+                const query = { templeteId: "welcomeEmail" }
+
+                const welcomeTemplete = await emailTempletesCollection.findOne(query);
+
+                if (welcomeTemplete.templeteId === "welcomeEmail") {
+                    console.log(welcomeTemplete)
+
+                    sendEmail(newUser, welcomeTemplete)
+
+                }
+
             }
 
-
         })
-
 
 
 
